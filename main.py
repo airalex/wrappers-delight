@@ -38,13 +38,14 @@ def main():
 
     render_scale = 4
     map_bbox = PIL.ImagePath.Path(desc['mine_map']).getbbox()
-    map_size = [math.ceil(a) + 2
+    map_size = [math.ceil(a) + 1
                 for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
-    im = PIL.Image.new('RGB', map_size, color='red')
+    im = PIL.Image.new('RGBA', map_size)
 
-    # path = PIL.ImagePath.Path(desc['mine_map'])
     d_ctx = PIL.ImageDraw.Draw(im)
     d_ctx.polygon(desc['mine_map'], fill='white')
+    d_ctx.point(desc['worker_pos'], fill='red')
+
     im = im.resize([s * render_scale for s in map_size])
     im.save('data/output/sample.png')
 
