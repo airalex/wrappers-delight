@@ -1,6 +1,7 @@
 import os
 from pprint import pprint
 import re
+import math
 
 import PIL.Image
 import PIL.ImageDraw
@@ -9,7 +10,7 @@ import toolz.functoolz as tzf
 
 
 def _desc_path():
-    return './data/part-1-initial/prob-001.desc'
+    return './data/part-1-initial/prob-002.desc'
 
 
 def _read_desc(path):
@@ -35,14 +36,16 @@ def main():
     desc = _read_desc(_desc_path())
     pprint(desc)
 
-    data_size = (10, 10)
-    render_scale = 20
-    im = PIL.Image.new('RGB', data_size, color='red')
+    render_scale = 4
+    map_bbox = PIL.ImagePath.Path(desc['mine_map']).getbbox()
+    map_size = [math.ceil(a) + 2
+                for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
+    im = PIL.Image.new('RGB', map_size, color='red')
 
     # path = PIL.ImagePath.Path(desc['mine_map'])
     d_ctx = PIL.ImageDraw.Draw(im)
     d_ctx.polygon(desc['mine_map'], fill='white')
-    im = im.resize([s * render_scale for s in data_size])
+    im = im.resize([s * render_scale for s in map_size])
     im.save('data/output/sample.png')
 
 
