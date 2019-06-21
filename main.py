@@ -4,6 +4,7 @@ import re
 
 import PIL.Image
 import PIL.ImageDraw
+import PIL.ImagePath
 import toolz.functoolz as tzf
 
 
@@ -31,15 +32,18 @@ def _read_desc(path):
 
 
 def main():
-    # data_size = (64, 64)
-    # im = PIL.Image.new('RGB', data_size, color='red')
-    # d = PIL.ImageDraw.Draw(im)
-    # d.text((10, 10), 'Hello, world')
+    desc = _read_desc(_desc_path())
+    pprint(desc)
 
-    # im = im.resize([s * 10 for s in data_size])
-    # im.save('data/output/sample.png')
+    data_size = (10, 10)
+    render_scale = 20
+    im = PIL.Image.new('RGB', data_size, color='red')
 
-    pprint(_read_desc(_desc_path()))
+    # path = PIL.ImagePath.Path(desc['mine_map'])
+    d_ctx = PIL.ImageDraw.Draw(im)
+    d_ctx.polygon(desc['mine_map'], fill='white')
+    im = im.resize([s * render_scale for s in data_size])
+    im.save('data/output/sample.png')
 
 
 if __name__ == '__main__':
