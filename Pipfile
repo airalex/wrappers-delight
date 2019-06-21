@@ -10,6 +10,7 @@ yapf = "*"
 
 [packages]
 pillow = "*"
+toolz = "*"
 
 [requires]
 python_version = "3.7"
