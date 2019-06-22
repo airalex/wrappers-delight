@@ -98,7 +98,7 @@ def _export_im(im, path, draw_opts):
 
 
 def _predict_action(state):
-    pass
+    return 'Z'
 
 
 def _update_state(state, action):
@@ -116,25 +116,33 @@ def _output_image_filepath(desc_path, turn, ext='.png'):
     return os.path.join(_output_image_dir(desc_path), '{}{}'.format(turn, ext))
 
 
+def _export_state(state, turn_i, desc_path, draw_opts):
+    map_bbox = PIL.ImagePath.Path(state['desc']['mine_corners']).getbbox()
+    map_size = [math.ceil(a * draw_opts['render_scale'])
+                for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
+    im = PIL.Image.new('RGBA', map_size)
+    _draw_state(im, state, draw_opts)
+
+    os.makedirs(_output_image_dir(desc_path), exist_ok=True)
+    _export_im(im, _output_image_filepath(desc_path, turn_i), draw_opts)
+
+
 def main():
     desc = _read_desc(_desc_path())
     pprint(desc)
 
-    draw_opts = {'render_scale': 10}
+    initial_state = {'desc': tzd.dissoc(desc, 'worker_pos'),
+                     'worker': {'pos': desc['worker_pos'],
+                                'orien': 'r'},
+                     'wrapped': {(0, 4), (0, 5)}}
 
-    map_bbox = PIL.ImagePath.Path(desc['mine_corners']).getbbox()
-    map_size = [math.ceil(a * draw_opts['render_scale'])
-                for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
-    im = PIL.Image.new('RGBA', map_size)
-
-    state = {'desc': tzd.dissoc(desc, 'worker_pos'),
-             'worker': {'pos': desc['worker_pos'],
-                        'orien': 'r'},
-             'wrapped': {(0, 4), (0, 5)}}
-    _draw_state(im, state, draw_opts)
-
-    os.makedirs(_output_image_dir(_desc_path()), exist_ok=True)
-    _export_im(im, _output_image_filepath(_desc_path(), turn=0), draw_opts)
+    states = [initial_state]
+    for turn_i in range(10):
+        prev_state = states[turn_i]
+        _export_state(prev_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
+        action = _predict_action(prev_state)
+        next_state = _update_state(prev_state, action)
+        states.append(next_state)
 
 
 if __name__ == '__main__':
