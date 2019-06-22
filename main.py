@@ -42,17 +42,33 @@ def _read_desc(path):
             'boosters_str': boosters_str}
 
 
-def _draw_state(im, draw_opts, state):
+def _draw_polygon(im, pts, scale, color):
     d_ctx = PIL.ImageDraw.Draw(im)
-    d_ctx.polygon(state['desc']['mine_map'], fill='white')
+    d_ctx.polygon([(x * scale, y * scale) for x, y in pts],
+                  fill=color)
+
+
+def _draw_point(im, pt, scale, color):
+    x, y = pt
+    _draw_polygon(im, [(x, y),
+                       (x + 1, y),
+                       (x + 1, y + 1),
+                       (x, y + 1)],
+                  scale=scale, color=color)
+
+
+def _draw_state(im, state, draw_opts):
+    d_ctx = PIL.ImageDraw.Draw(im)
+    _draw_polygon(im, state['desc']['mine_map'], scale=draw_opts['render_scale'], color='white')
     for obs_pts in state['desc']['obstacles']:
-        d_ctx.polygon(obs_pts, fill='gray')
-    d_ctx.point(state['desc']['worker_pos'], fill='red')
+        _draw_polygon(im, obs_pts,
+                      scale=draw_opts['render_scale'], color='gray')
+    _draw_point(im, state['desc']['worker_pos'],
+                scale=draw_opts['render_scale'], color='red')
 
 
-def _export_im(im, draw_opts, path):
+def _export_im(im, path, draw_opts):
     im = im.transpose(PIL.Image.FLIP_TOP_BOTTOM)
-    im = im.resize([s * draw_opts['render_scale'] for s in im.size])
     im.save(path)
 
 
@@ -60,14 +76,15 @@ def main():
     desc = _read_desc(_desc_path())
     pprint(desc)
 
+    draw_opts = {'render_scale': 10}
+
     map_bbox = PIL.ImagePath.Path(desc['mine_map']).getbbox()
-    map_size = [math.ceil(a) + 1
+    map_size = [math.ceil(a * draw_opts['render_scale'])
                 for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
     im = PIL.Image.new('RGBA', map_size)
 
-    draw_opts = {'render_scale': 1}
-    _draw_state(im, draw_opts, {'desc': desc})
-    _export_im(im, draw_opts, 'data/output/sample.png')
+    _draw_state(im, {'desc': desc}, draw_opts)
+    _export_im(im, 'data/output/sample.png', draw_opts)
 
 
 if __name__ == '__main__':
