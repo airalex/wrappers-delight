@@ -1,4 +1,3 @@
-import os
 from pprint import pprint
 import re
 import math
@@ -10,7 +9,26 @@ import toolz.functoolz as tzf
 
 
 def _desc_path():
-    return './data/part-1-initial/prob-002.desc'
+    return './data/part-1-examples/example-01.desc'
+
+
+def _point_pattern():
+    return r'\((\d+),(\d+)\)'
+
+
+def _parse_map_str(map_str):
+    return tzf.thread_last(re.findall(_point_pattern(), map_str),
+                           (map, lambda p: tuple(int(x) for x in p)),
+                           list)
+
+
+def _parse_worker_pos(worker_str):
+    return _parse_map_str(worker_str)[0]
+
+def _parse_obstacles_str(s):
+    return tzf.thread_last(s.split(';'),
+                           (map, _parse_map_str),
+                           list)
 
 
 def _read_desc(path):
@@ -18,17 +36,9 @@ def _read_desc(path):
         contents = f.read()
     mine_map_str, worker_pos_str, obstacles_str, boosters_str = contents.split('#')
 
-    point_pattern = r'\((\d+),(\d+)\)'
-    mine_points = tzf.thread_last(re.findall(point_pattern, mine_map_str),
-                                  (map, lambda p: tuple(int(x) for x in p)),
-                                  list)
-    worker_pos = tzf.thread_last(re.match(point_pattern, worker_pos_str).groups(),
-                                 (map, int),
-                                 tuple)
-
-    return {'mine_map': mine_points,
-            'worker_pos': worker_pos,
-            'obstacles_str': obstacles_str,
+    return {'mine_map': _parse_map_str(mine_map_str),
+            'worker_pos': _parse_worker_pos(worker_pos_str),
+            'obstacles_pts': _parse_obstacles_str(obstacles_str),
             'boosters_str': boosters_str}
 
 
@@ -36,7 +46,7 @@ def main():
     desc = _read_desc(_desc_path())
     pprint(desc)
 
-    render_scale = 4
+    render_scale = 8
     map_bbox = PIL.ImagePath.Path(desc['mine_map']).getbbox()
     map_size = [math.ceil(a) + 1
                 for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
