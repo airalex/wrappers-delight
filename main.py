@@ -1,4 +1,5 @@
 import os
+import shutil
 from pprint import pprint
 import re
 import math
@@ -137,6 +138,7 @@ def main():
                      'wrapped': {(0, 4), (0, 5)}}
 
     states = [initial_state]
+    shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
     for turn_i in range(10):
         prev_state = states[turn_i]
         _export_state(prev_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
