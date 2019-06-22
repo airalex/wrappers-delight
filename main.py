@@ -58,6 +58,21 @@ def _draw_point(im, pt, scale, color):
                   scale=scale, color=color)
 
 
+def _worker_reach_pts(pos, orien):
+    x, y = pos
+    if orien == 'r':
+        return [(x, y),
+                (x + 1, y - 1),
+                (x + 1, y),
+                (x + 1, y + 1)]
+    elif orien == 'l':
+        return [(x, y),
+                (x - 1, y - 1),
+                (x - 1, y),
+                (x - 1, y + 1)]
+
+
+
 def _draw_state(im, state, draw_opts):
     d_ctx = PIL.ImageDraw.Draw(im)
 
@@ -70,6 +85,9 @@ def _draw_state(im, state, draw_opts):
     for pt in state['wrapped']:
         _draw_point(im, pt, scale=draw_opts['render_scale'], color='silver')
 
+    for pt in _worker_reach_pts(state['worker']['pos'], state['worker']['orien']):
+        _draw_point(im, pt,
+                    scale=draw_opts['render_scale'], color='darkorange')
     _draw_point(im, state['worker']['pos'],
                 scale=draw_opts['render_scale'], color='red')
 
@@ -93,7 +111,7 @@ def main():
     state = {'desc': tzd.dissoc(desc, 'worker_pos'),
              'worker': {'pos': desc['worker_pos'],
                         'orien': 'r'},
-             'wrapped': [(0, 4), (0, 5)]}
+             'wrapped': {(0, 4), (0, 5)}}
     _draw_state(im, state, draw_opts)
     _export_im(im, 'data/output/sample.png', draw_opts)
 
