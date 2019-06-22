@@ -9,6 +9,7 @@ import PIL.ImageDraw
 import PIL.ImagePath
 import toolz.functoolz as tzf
 import toolz.dicttoolz as tzd
+import clj
 
 
 def _desc_path():
@@ -99,11 +100,25 @@ def _export_im(im, path, draw_opts):
 
 
 def _predict_action(state):
-    return 'Z'
+    return 'W'
+
+
+def _set_insert(s, e):
+    return s.union([e])
 
 
 def _update_state(state, action):
-    return state
+    state = tzd.update_in(state, ['wrapped'], lambda w: _set_insert(w, state['worker']['pos']))
+    if action == 'Z':
+        return state
+    elif action == 'W':
+        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0], p[1] + 1))
+    elif action == 'S':
+        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0], p[1] - 1))
+    elif action == 'A':
+        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0] - 1, p[1]))
+    elif action == 'D':
+        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0] + 1, p[1]))
 
 
 def _output_image_dir(desc_path):
@@ -135,7 +150,7 @@ def main():
     initial_state = {'desc': tzd.dissoc(desc, 'worker_pos'),
                      'worker': {'pos': desc['worker_pos'],
                                 'orien': 'r'},
-                     'wrapped': {(0, 4), (0, 5)}}
+                     'wrapped': set()}
 
     states = [initial_state]
     shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
