@@ -60,10 +60,16 @@ def _draw_point(im, pt, scale, color):
 
 def _draw_state(im, state, draw_opts):
     d_ctx = PIL.ImageDraw.Draw(im)
+
     _draw_polygon(im, state['desc']['mine_corners'], scale=draw_opts['render_scale'], color='white')
+
     for obs_pts in state['desc']['obstacles_corners']:
         _draw_polygon(im, obs_pts,
                       scale=draw_opts['render_scale'], color='gray')
+
+    for pt in state['wrapped']:
+        _draw_point(im, pt, scale=draw_opts['render_scale'], color='silver')
+
     _draw_point(im, state['worker']['pos'],
                 scale=draw_opts['render_scale'], color='red')
 
@@ -87,7 +93,7 @@ def main():
     state = {'desc': tzd.dissoc(desc, 'worker_pos'),
              'worker': {'pos': desc['worker_pos'],
                         'orien': 'r'},
-             'wrapped': []}
+             'wrapped': [(0, 4), (0, 5)]}
     _draw_state(im, state, draw_opts)
     _export_im(im, 'data/output/sample.png', draw_opts)
 
