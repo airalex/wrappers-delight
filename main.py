@@ -1,3 +1,4 @@
+import os
 from pprint import pprint
 import re
 import math
@@ -72,7 +73,6 @@ def _worker_reach_pts(pos, orien):
                 (x - 1, y + 1)]
 
 
-
 def _draw_state(im, state, draw_opts):
     d_ctx = PIL.ImageDraw.Draw(im)
 
@@ -97,6 +97,25 @@ def _export_im(im, path, draw_opts):
     im.save(path)
 
 
+def _predict_action(state):
+    pass
+
+
+def _update_state(state, action):
+    return state
+
+
+def _output_image_dir(desc_path):
+    desc_name = tzf.thread_last(desc_path,
+                                os.path.basename,
+                                os.path.splitext)[0]
+    return os.path.join('./data/output', desc_name)
+
+
+def _output_image_filepath(desc_path, turn, ext='.png'):
+    return os.path.join(_output_image_dir(desc_path), '{}{}'.format(turn, ext))
+
+
 def main():
     desc = _read_desc(_desc_path())
     pprint(desc)
@@ -113,7 +132,9 @@ def main():
                         'orien': 'r'},
              'wrapped': {(0, 4), (0, 5)}}
     _draw_state(im, state, draw_opts)
-    _export_im(im, 'data/output/sample.png', draw_opts)
+
+    os.makedirs(_output_image_dir(_desc_path()), exist_ok=True)
+    _export_im(im, _output_image_filepath(_desc_path(), turn=0), draw_opts)
 
 
 if __name__ == '__main__':
