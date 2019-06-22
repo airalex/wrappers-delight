@@ -108,7 +108,26 @@ def _export_im(im, path, draw_opts):
     im.save(path)
 
 
-# def _
+def _tile_pt2center(pt):
+    x, y = pt
+    return x + 0.5, y + 0.5
+
+
+def _center2tile_pt(pt):
+    x, y = pt
+    return round(x - 0.5), round(y - 0.5)
+
+
+def _move_projection(pos, move):
+    x, y = pos
+    if move == 'W':
+        return x, y + 1
+    elif move == 'S':
+        return x, y - 1
+    elif move == 'A':
+        return x - 1, y
+    elif move == 'D':
+        return x + 1, y
 
 
 def _predict_action(state):
@@ -117,7 +136,16 @@ def _predict_action(state):
     wrapped = shapely.ops.unary_union(wrappeds)
     not_wrapped = mine.difference(wrapped)
     print(not_wrapped.area)
-    return 'W'
+
+    last_move = state.get('last_move', 'W')
+    proj = tzf.thread_first(state['worker']['pos'],
+                            (_move_projection, last_move),
+                            _tile_pt2center,
+                            lambda pt: shapely.geometry.Point(*pt))
+    if not_wrapped.contains(proj):
+        return last_move
+    else:
+        return 'Z'
 
 
 def _update_state(state, action):
