@@ -10,6 +10,8 @@ import PIL.ImagePath
 import toolz.functoolz as tzf
 import toolz.dicttoolz as tzd
 import clj
+import shapely
+import shapely.geometry
 
 
 def _desc_path():
@@ -41,9 +43,9 @@ def _read_desc(path):
         contents = f.read()
     mine_map_str, worker_pos_str, obstacles_str, boosters_str = contents.split('#')
 
-    return {'mine_corners': _parse_map_str(mine_map_str),
+    return {'mine_shell': _parse_map_str(mine_map_str),
             'worker_pos': _parse_worker_pos(worker_pos_str),
-            'obstacles_corners': _parse_obstacles_str(obstacles_str)}
+            'obstacle_shells': _parse_obstacles_str(obstacles_str)}
 
 
 def _draw_polygon(im, pts, scale, color):
@@ -52,12 +54,16 @@ def _draw_polygon(im, pts, scale, color):
                   fill=color)
 
 
-def _draw_point(im, pt, scale, color):
+def _pt2shell(pt):
     x, y = pt
-    _draw_polygon(im, [(x, y),
-                       (x + 1, y),
-                       (x + 1, y + 1),
-                       (x, y + 1)],
+    return [(x, y),
+            (x + 1, y),
+            (x + 1, y + 1),
+            (x, y + 1)]
+
+
+def _draw_point(im, pt, scale, color):
+    _draw_polygon(im, _pt2shell(pt),
                   scale=scale, color=color)
 
 
@@ -78,14 +84,16 @@ def _worker_reach_pts(pos, orien):
 def _draw_state(im, state, draw_opts):
     d_ctx = PIL.ImageDraw.Draw(im)
 
-    _draw_polygon(im, state['desc']['mine_corners'], scale=draw_opts['render_scale'], color='white')
+    _draw_polygon(im, state['desc']['mine_shell'], scale=draw_opts['render_scale'], color='white')
 
-    for obs_pts in state['desc']['obstacles_corners']:
+    for obs_pts in state['desc']['obstacle_shells']:
         _draw_polygon(im, obs_pts,
                       scale=draw_opts['render_scale'], color='gray')
 
-    for pt in state['wrapped']:
-        _draw_point(im, pt, scale=draw_opts['render_scale'], color='silver')
+    for shell in state['wrapped_shells']:
+        # _draw_point(im, pt, scale=draw_opts['render_scale'], color='silver')
+        _draw_polygon(im, shell,
+                      scale=draw_opts['render_scale'], color='silver')
 
     for pt in _worker_reach_pts(state['worker']['pos'], state['worker']['orien']):
         _draw_point(im, pt,
@@ -99,16 +107,21 @@ def _export_im(im, path, draw_opts):
     im.save(path)
 
 
+# def _
+
+
 def _predict_action(state):
+    mine = shapely.geometry.Polygon(state['desc']['mine_shell'])
+    wrappeds = [shapely.geometry.Polygon(sh) for sh in state['wrapped_shells']]
     return 'W'
 
 
-def _set_insert(s, e):
-    return s.union([e])
-
-
 def _update_state(state, action):
-    state = tzd.update_in(state, ['wrapped'], lambda w: _set_insert(w, state['worker']['pos']))
+    # TODO: simplify (join) wrapped shells
+    state = tzd.update_in(state, ['wrapped_shells'],
+                          lambda shs: shs + [_pt2shell(state['worker']['pos'])])
+
+
     if action == 'Z':
         return state
     elif action == 'W':
@@ -133,7 +146,7 @@ def _output_image_filepath(desc_path, turn, ext='.png'):
 
 
 def _export_state(state, turn_i, desc_path, draw_opts):
-    map_bbox = PIL.ImagePath.Path(state['desc']['mine_corners']).getbbox()
+    map_bbox = PIL.ImagePath.Path(state['desc']['mine_shell']).getbbox()
     map_size = [math.ceil(a * draw_opts['render_scale'])
                 for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
     im = PIL.Image.new('RGBA', map_size)
@@ -150,7 +163,7 @@ def main():
     initial_state = {'desc': tzd.dissoc(desc, 'worker_pos'),
                      'worker': {'pos': desc['worker_pos'],
                                 'orien': 'r'},
-                     'wrapped': set()}
+                     'wrapped_shells': []}
 
     states = [initial_state]
     shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
