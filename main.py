@@ -51,6 +51,7 @@ def _draw_state(im, draw_opts, state):
 
 
 def _export_im(im, draw_opts, path):
+    im = im.transpose(PIL.Image.FLIP_TOP_BOTTOM)
     im = im.resize([s * draw_opts['render_scale'] for s in im.size])
     im.save(path)
 
