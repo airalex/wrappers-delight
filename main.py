@@ -12,6 +12,7 @@ import toolz.dicttoolz as tzd
 import clj
 import shapely
 import shapely.geometry
+import shapely.ops
 
 
 def _desc_path():
@@ -113,6 +114,9 @@ def _export_im(im, path, draw_opts):
 def _predict_action(state):
     mine = shapely.geometry.Polygon(state['desc']['mine_shell'])
     wrappeds = [shapely.geometry.Polygon(sh) for sh in state['wrapped_shells']]
+    wrapped = shapely.ops.unary_union(wrappeds)
+    not_wrapped = mine.difference(wrapped)
+    print(not_wrapped.area)
     return 'W'
 
 
