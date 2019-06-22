@@ -108,17 +108,17 @@ def _export_im(im, path, draw_opts):
     im.save(path)
 
 
-def _tile_pt2center(pt):
+def _tile_pt2center_pt(pt):
     x, y = pt
     return x + 0.5, y + 0.5
 
 
-def _center2tile_pt(pt):
+def _center_pt2tile_pt(pt):
     x, y = pt
     return round(x - 0.5), round(y - 0.5)
 
 
-def _move_projection(pos, move):
+def _move_projection_tile(pos, move):
     x, y = pos
     if move == 'W':
         return x, y + 1
@@ -130,6 +130,13 @@ def _move_projection(pos, move):
         return x + 1, y
 
 
+def _move_projection_center(pos, move):
+    return tzf.thread_first(pos,
+                            (_move_projection_tile, move),
+                            _tile_pt2center_pt,
+                            lambda pt: shapely.geometry.Point(*pt))
+
+
 def _predict_action(state):
     mine = shapely.geometry.Polygon(state['desc']['mine_shell'])
     wrappeds = [shapely.geometry.Polygon(sh) for sh in state['wrapped_shells']]
@@ -138,14 +145,14 @@ def _predict_action(state):
     print(not_wrapped.area)
 
     last_move = state.get('last_move', 'W')
-    proj = tzf.thread_first(state['worker']['pos'],
-                            (_move_projection, last_move),
-                            _tile_pt2center,
-                            lambda pt: shapely.geometry.Point(*pt))
-    if not_wrapped.contains(proj):
-        return last_move
-    else:
-        return 'Z'
+    for move in [last_move, 'W', 'S', 'A', 'D']:
+        proj = _move_projection_center(state['worker']['pos'], move)
+        if not_wrapped.contains(proj):
+            return move
+
+    # TODO: find path to nearest unwrapped tile
+
+    return 'Z'
 
 
 def _update_state(state, action):
@@ -199,7 +206,7 @@ def main():
 
     states = [initial_state]
     shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
-    for turn_i in range(10):
+    for turn_i in range(100):
         prev_state = states[turn_i]
         _export_state(prev_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
         action = _predict_action(prev_state)
