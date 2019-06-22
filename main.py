@@ -6,10 +6,12 @@ import PIL.Image
 import PIL.ImageDraw
 import PIL.ImagePath
 import toolz.functoolz as tzf
+import toolz.dicttoolz as tzd
 
 
 def _desc_path():
-    return './data/part-1-examples/example-01.desc'
+    # return './data/part-1-examples/example-01.desc'
+    return './data/part-1-initial/prob-004.desc'
 
 
 def _point_pattern():
@@ -36,10 +38,9 @@ def _read_desc(path):
         contents = f.read()
     mine_map_str, worker_pos_str, obstacles_str, boosters_str = contents.split('#')
 
-    return {'mine_map': _parse_map_str(mine_map_str),
+    return {'mine_corners': _parse_map_str(mine_map_str),
             'worker_pos': _parse_worker_pos(worker_pos_str),
-            'obstacles': _parse_obstacles_str(obstacles_str),
-            'boosters_str': boosters_str}
+            'obstacles_corners': _parse_obstacles_str(obstacles_str)}
 
 
 def _draw_polygon(im, pts, scale, color):
@@ -59,11 +60,11 @@ def _draw_point(im, pt, scale, color):
 
 def _draw_state(im, state, draw_opts):
     d_ctx = PIL.ImageDraw.Draw(im)
-    _draw_polygon(im, state['desc']['mine_map'], scale=draw_opts['render_scale'], color='white')
-    for obs_pts in state['desc']['obstacles']:
+    _draw_polygon(im, state['desc']['mine_corners'], scale=draw_opts['render_scale'], color='white')
+    for obs_pts in state['desc']['obstacles_corners']:
         _draw_polygon(im, obs_pts,
                       scale=draw_opts['render_scale'], color='gray')
-    _draw_point(im, state['desc']['worker_pos'],
+    _draw_point(im, state['worker']['pos'],
                 scale=draw_opts['render_scale'], color='red')
 
 
@@ -78,12 +79,16 @@ def main():
 
     draw_opts = {'render_scale': 10}
 
-    map_bbox = PIL.ImagePath.Path(desc['mine_map']).getbbox()
+    map_bbox = PIL.ImagePath.Path(desc['mine_corners']).getbbox()
     map_size = [math.ceil(a * draw_opts['render_scale'])
                 for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
     im = PIL.Image.new('RGBA', map_size)
 
-    _draw_state(im, {'desc': desc}, draw_opts)
+    state = {'desc': tzd.dissoc(desc, 'worker_pos'),
+             'worker': {'pos': desc['worker_pos'],
+                        'orien': 'r'},
+             'wrapped': []}
+    _draw_state(im, state, draw_opts)
     _export_im(im, 'data/output/sample.png', draw_opts)
 
 
