@@ -12,6 +12,8 @@ ipdb = "*"
 [packages]
 pillow = "*"
 toolz = "*"
+shapely = "*"
+clj = "*"
 
 [requires]
 python_version = "3.7"
