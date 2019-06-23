@@ -13,6 +13,9 @@ import clj
 import shapely
 import shapely.geometry
 import shapely.ops
+import scipy as sp
+import scipy.sparse
+import scipy.sparse.csgraph
 
 
 def _desc_path():
@@ -118,6 +121,16 @@ def _center_pt2tile_pt(pt):
     return round(x - 0.5), round(y - 0.5)
 
 
+def _shapely_point2pt(point):
+    x, y, *_ = point.bounds
+    return x, y
+
+
+def _snap_to_tile(pt):
+    x, y = pt
+    return math.floor(x), math.floor(y)
+
+
 def _move_projection_tile(pos, move):
     x, y = pos
     if move == 'W':
@@ -137,6 +150,56 @@ def _move_projection_center(pos, move):
                             lambda pt: shapely.geometry.Point(*pt))
 
 
+def _incidence_ind(x, y, x_size):
+    return y * x_size + x
+
+
+def _incidence_pt(ind, x_size):
+    return ind % x_size, ind // x_size
+
+
+def _incidence_matrix(polygon):
+    x_min = round(polygon.bounds[0])
+    y_min = round(polygon.bounds[1])
+    x_max = math.ceil(polygon.bounds[2])
+    y_max = math.ceil(polygon.bounds[3])
+
+    incidence = sp.sparse.dok_matrix((x_max * y_max, x_max * y_max), dtype=bool)
+    for tile_y in range(y_min, y_max):
+        for tile_x in range(x_min, x_max):
+            middle_ind = _incidence_ind(tile_x, tile_y, x_size=x_max)
+            for move in ['W', 'S', 'A', 'D']:
+                moved_center = _move_projection_center((tile_x, tile_y), move)
+                if polygon.contains(moved_center):
+                    moved_tile = tzf.thread_first(moved_center,
+                                                  _shapely_point2pt,
+                                                  _center_pt2tile_pt)
+                    moved_ind = _incidence_ind(moved_tile[0], moved_tile[1], x_size=x_max)
+                    incidence[middle_ind, moved_ind] = True
+
+    return incidence.tocsr()
+
+
+def _path_inds(predecessors, start_vertex_ind):
+    path = []
+    next_ind = predecessors[start_vertex_ind]
+    while next_ind != -9999:
+        path.append(next_ind)
+        next_ind = predecessors[next_ind]
+    return path
+
+
+def _projection_pt_move(pos_pt, proj_pt):
+    if proj_pt[1] > pos_pt[1]:
+        return 'W'
+    elif proj_pt[1] < pos_pt[1]:
+        return 'S'
+    elif proj_pt[0] < pos_pt[0]:
+        return 'A'
+    elif proj_pt[0] > pos_pt[0]:
+        return 'D'
+
+
 def _predict_action(state):
     mine = shapely.geometry.Polygon(state['desc']['mine_shell'])
     obstacles = [shapely.geometry.Polygon(sh) for sh in state['desc']['obstacle_shells']]
@@ -151,18 +214,39 @@ def _predict_action(state):
     for move in [last_move, 'W', 'S', 'A', 'D']:
         proj = _move_projection_center(state['worker']['pos'], move)
         if not_wrapped.contains(proj):
-            return move
+            return move, state
 
-    # TODO: find path to nearest unwrapped tile
+    if not state.get('path_pts_to_not_wrapped'):
+        incidence_m = _incidence_matrix(situable)
+        target_tile = tzf.thread_first(not_wrapped.representative_point(),
+                                       _shapely_point2pt,
+                                       _snap_to_tile)
+        target_vertex_ind = _incidence_ind(target_tile[0], target_tile[1], x_size=math.ceil(situable.bounds[2]))
+        path_dists, path_predecessors = sp.sparse.csgraph.shortest_path(csgraph=incidence_m,
+                                                                        directed=False,
+                                                                        return_predecessors=True,
+                                                                        unweighted=True,
+                                                                        indices=target_vertex_ind)
+        start_vertex_ind = _incidence_ind(state['worker']['pos'][0],
+                                          state['worker']['pos'][1],
+                                          x_size=math.ceil(situable.bounds[2]))
 
-    return 'Z'
+        path_inds = _path_inds(path_predecessors, start_vertex_ind)
+        path_pts = [_incidence_pt(ind, x_size=math.ceil(situable.bounds[2]))
+                    for ind in path_inds]
+        state = tzd.assoc(state, 'path_pts_to_not_wrapped', path_pts)
+
+    path_move = _projection_pt_move(state['worker']['pos'], state['path_pts_to_not_wrapped'][0])
+    if path_move is not None:
+        return path_move, tzd.update_in(state, ['path_pts_to_not_wrapped'], lambda p: p[1:])
+
+    return 'Z', state
 
 
 def _update_state(state, action):
     # TODO: simplify (join) wrapped shells
     state = tzd.update_in(state, ['wrapped_shells'],
                           lambda shs: shs + [_pt2shell(state['worker']['pos'])])
-
 
     if action == 'Z':
         return state
@@ -209,11 +293,11 @@ def main():
 
     states = [initial_state]
     shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
-    for turn_i in range(60):
+    for turn_i in range(300):
         prev_state = states[turn_i]
         _export_state(prev_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
-        action = _predict_action(prev_state)
-        next_state = _update_state(prev_state, action)
+        action, intermediate_state = _predict_action(prev_state)
+        next_state = _update_state(intermediate_state, action)
         states.append(next_state)
 
 
