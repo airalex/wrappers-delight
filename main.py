@@ -20,7 +20,7 @@ import scipy.sparse.csgraph
 
 def _desc_path():
     # return './data/part-1-examples/example-01.desc'
-    return './data/part-1-initial/prob-002.desc'
+    return './data/part-1-initial/prob-003.desc'
 
 
 def _point_pattern():
@@ -274,12 +274,18 @@ def _output_image_dir(desc_path):
     desc_name = tzf.thread_last(desc_path,
                                 os.path.basename,
                                 os.path.splitext)[0]
-    return os.path.join('./data/output', desc_name)
+    return os.path.join('./data/output', desc_name, 'imgs')
 
 
 def _output_image_filepath(desc_path, turn, ext='.png'):
-    return os.path.join(_output_image_dir(desc_path), '{}{}'.format(turn, ext))
+    return os.path.join(_output_image_dir(desc_path), '{:04d}{}'.format(turn, ext))
 
+
+def _output_actions_filepath(desc_path):
+    desc_name = tzf.thread_last(desc_path,
+                                os.path.basename,
+                                os.path.splitext)[0]
+    return './data/output/{}.sol'.format(desc_name)
 
 def _export_state(state, turn_i, desc_path, draw_opts):
     map_bbox = PIL.ImagePath.Path(state['desc']['mine_shell']).getbbox()
@@ -292,6 +298,12 @@ def _export_state(state, turn_i, desc_path, draw_opts):
     _export_im(im, _output_image_filepath(desc_path, turn_i), draw_opts)
 
 
+def _export_actions(actions, path):
+    with open(path, 'w') as f:
+        for a in actions:
+            f.write(a)
+
+
 def main():
     desc = _read_desc(_desc_path())
     pprint(desc)
@@ -302,8 +314,9 @@ def main():
                      'wrapped_shells': []}
 
     states = [initial_state]
+    actions = []
     shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
-    for turn_i in range(600):
+    for turn_i in range(500):
         print('- turn {}'.format(turn_i))
         prev_state = states[turn_i]
         action, intermediate_state = _predict_action(prev_state)
@@ -311,6 +324,9 @@ def main():
             _export_state(intermediate_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
         next_state = _update_state(intermediate_state, action)
         states.append(next_state)
+        actions.append(action)
+
+    _export_actions(actions, _output_actions_filepath(_desc_path()))
 
     # draw_opts = {'render_scale': 10}
     # desc_path = _desc_path()
