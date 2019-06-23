@@ -229,7 +229,12 @@ def _predict_action(state):
                                        _snap_to_tile)
         print('Finding shortest path from tile {} to {}'.format(state['worker']['pos'], target_tile))
 
-        incidence_m = _incidence_matrix(situable)
+        if tzd.get_in(['cache', 'incidence_m'], state) is None:
+            incidence_m = _incidence_matrix(situable)
+            state = tzd.assoc_in(state, ['cache', 'incidence_m'], incidence_m)
+        else:
+            incidence_m = state['cache']['incidence_m']
+
         target_vertex_ind = _incidence_ind(target_tile[0], target_tile[1], x_size=math.ceil(situable.bounds[2]))
         path_dists, path_predecessors = sp.sparse.csgraph.shortest_path(csgraph=incidence_m,
                                                                         directed=False,
@@ -286,6 +291,7 @@ def _output_actions_filepath(desc_path):
                                 os.path.basename,
                                 os.path.splitext)[0]
     return './data/output/{}.sol'.format(desc_name)
+
 
 def _export_state(state, turn_i, desc_path, draw_opts):
     map_bbox = PIL.ImagePath.Path(state['desc']['mine_shell']).getbbox()
