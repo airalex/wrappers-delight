@@ -155,7 +155,9 @@ def _incidence_ind(x, y, x_size):
 
 
 def _incidence_pt(ind, x_size):
-    return ind % x_size, ind // x_size
+    x = ind % x_size
+    y = (ind - x) // x_size
+    return x, y
 
 
 def _incidence_matrix(polygon):
