@@ -20,7 +20,7 @@ import scipy.sparse.csgraph
 
 def _desc_path():
     # return './data/part-1-examples/example-01.desc'
-    return './data/part-1-initial/prob-003.desc'
+    return './data/part-1-initial/prob-001.desc'
 
 
 def _point_pattern():
@@ -39,6 +39,7 @@ def _parse_worker_pos(worker_str):
 def _parse_obstacles_str(s):
     return tzf.thread_last(s.split(';'),
                            (map, _parse_map_str),
+                           (filter, None),
                            list)
 
 
@@ -217,6 +218,9 @@ def _predict_action(state):
     wrapped = shapely.ops.unary_union(wrappeds)
     not_wrapped = situable.difference(wrapped)
 
+    if not_wrapped.area < 1.0:
+        return None, state
+
     last_move = state.get('last_move', 'W')
     for move in [last_move, 'W', 'S', 'A', 'D']:
         proj = _move_projection_center(state['worker']['pos'], move)
@@ -259,20 +263,13 @@ def _predict_action(state):
 
 
 def _update_state(state, action):
-    # TODO: simplify (join) wrapped shells
-    state = tzd.update_in(state, ['wrapped_shells'],
-                          lambda shs: shs + [_pt2shell(state['worker']['pos'])])
+    new_worker_pos = _move_projection_tile(state['worker']['pos'], action)
+    if new_worker_pos is not None:
+        state = tzd.assoc_in(state, ['worker', 'pos'], new_worker_pos)
 
-    if action == 'Z':
-        return state
-    elif action == 'W':
-        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0], p[1] + 1))
-    elif action == 'S':
-        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0], p[1] - 1))
-    elif action == 'A':
-        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0] - 1, p[1]))
-    elif action == 'D':
-        return tzd.update_in(state, ['worker', 'pos'], lambda p: (p[0] + 1, p[1]))
+    # TODO: simplify (join) wrapped shells
+    return tzd.update_in(state, ['wrapped_shells'],
+                         lambda shells: shells + [_pt2shell(state['worker']['pos'])])
 
 
 def _output_image_dir(desc_path):
@@ -317,7 +314,7 @@ def main():
     initial_state = {'desc': tzd.dissoc(desc, 'worker_pos'),
                      'worker': {'pos': desc['worker_pos'],
                                 'orien': 'r'},
-                     'wrapped_shells': []}
+                     'wrapped_shells': [_pt2shell(desc['worker_pos'])]}
 
     states = [initial_state]
     actions = []
@@ -326,8 +323,13 @@ def main():
         print('- turn {}'.format(turn_i))
         prev_state = states[turn_i]
         action, intermediate_state = _predict_action(prev_state)
+
         if turn_i in range(0, 1000):
             _export_state(intermediate_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
+
+        if action is None:
+            break
+
         next_state = _update_state(intermediate_state, action)
         states.append(next_state)
         actions.append(action)
