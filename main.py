@@ -20,7 +20,7 @@ import scipy.sparse.csgraph
 
 def _desc_path():
     # return './data/part-1-examples/example-01.desc'
-    return './data/part-1-initial/prob-001.desc'
+    return './data/part-1-initial/prob-002.desc'
 
 
 def _point_pattern():
@@ -262,14 +262,30 @@ def _predict_action(state):
     return 'Z', state
 
 
+def _polygon2shells(polygon):
+    try:
+        xs, ys = polygon.boundary.xy
+        return [list(zip(xs, ys))]
+    except NotImplementedError:
+        shells = []
+        for mls in polygon.boundary.geoms:
+            xs, ys = mls.xy
+            shells.append(list(zip(xs, ys)))
+        return shells
+
+
 def _update_state(state, action):
     new_worker_pos = _move_projection_tile(state['worker']['pos'], action)
     if new_worker_pos is not None:
         state = tzd.assoc_in(state, ['worker', 'pos'], new_worker_pos)
 
-    # TODO: simplify (join) wrapped shells
-    return tzd.update_in(state, ['wrapped_shells'],
-                         lambda shells: shells + [_pt2shell(state['worker']['pos'])])
+    # without joining on example 2, 500 iters: 22.36s
+    # with joining on example 2, 500 iters: 3.87s
+    new_wrapped_shells = state['wrapped_shells'] + [_pt2shell(state['worker']['pos'])]
+    wrapped = shapely.ops.unary_union([shapely.geometry.Polygon(sh)
+                                       for sh in new_wrapped_shells])
+    wrapped_simple = wrapped.simplify(0.01)
+    return tzd.assoc(state, 'wrapped_shells', _polygon2shells(wrapped_simple))
 
 
 def _output_image_dir(desc_path):
@@ -324,7 +340,8 @@ def main():
         prev_state = states[turn_i]
         action, intermediate_state = _predict_action(prev_state)
 
-        if turn_i in range(0, 1000):
+        if turn_i % 50 == 0:
+        # if True:
             _export_state(intermediate_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
 
         if action is None:
