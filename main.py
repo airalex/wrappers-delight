@@ -52,7 +52,7 @@ def _read_desc(path):
             'obstacle_shells': _parse_obstacles_str(obstacles_str)}
 
 
-def _draw_polygon(im, pts, scale, color):
+def _draw_shell(im, pts, scale, color):
     d_ctx = PIL.ImageDraw.Draw(im)
     d_ctx.polygon([(x * scale, y * scale) for x, y in pts],
                   fill=color)
@@ -67,8 +67,8 @@ def _pt2shell(pt):
 
 
 def _draw_point(im, pt, scale, color):
-    _draw_polygon(im, _pt2shell(pt),
-                  scale=scale, color=color)
+    _draw_shell(im, _pt2shell(pt),
+                scale=scale, color=color)
 
 
 def _worker_reach_pts(pos, orien):
@@ -88,22 +88,22 @@ def _worker_reach_pts(pos, orien):
 def _draw_state(im, state, draw_opts):
     d_ctx = PIL.ImageDraw.Draw(im)
 
-    _draw_polygon(im, state['desc']['mine_shell'], scale=draw_opts['render_scale'], color='white')
+    _draw_shell(im, state['desc']['mine_shell'], scale=draw_opts['render_scale'], color='white')
 
     for obs_pts in state['desc']['obstacle_shells']:
-        _draw_polygon(im, obs_pts,
-                      scale=draw_opts['render_scale'], color='gray')
+        _draw_shell(im, obs_pts, scale=draw_opts['render_scale'], color='gray')
 
     for shell in state['wrapped_shells']:
-        # _draw_point(im, pt, scale=draw_opts['render_scale'], color='silver')
-        _draw_polygon(im, shell,
-                      scale=draw_opts['render_scale'], color='silver')
+        _draw_shell(im, shell, scale=draw_opts['render_scale'], color='silver')
 
-    for pt in _worker_reach_pts(state['worker']['pos'], state['worker']['orien']):
-        _draw_point(im, pt,
-                    scale=draw_opts['render_scale'], color='darkorange')
+    # for pt in _worker_reach_pts(state['worker']['pos'], state['worker']['orien']):
+    #     _draw_point(im, pt,
+    #                 scale=draw_opts['render_scale'], color='darkorange')
     _draw_point(im, state['worker']['pos'],
                 scale=draw_opts['render_scale'], color='red')
+
+    for pt in state.get('path_pts_to_not_wrapped', []):
+        _draw_point(im, pt, scale=draw_opts['render_scale'], color='indigo')
 
 
 def _export_im(im, path, draw_opts):
@@ -208,19 +208,20 @@ def _predict_action(state):
     wrappeds = [shapely.geometry.Polygon(sh) for sh in state['wrapped_shells']]
     wrapped = shapely.ops.unary_union(wrappeds)
     not_wrapped = situable.difference(wrapped)
-    print(not_wrapped.area)
 
     last_move = state.get('last_move', 'W')
     for move in [last_move, 'W', 'S', 'A', 'D']:
         proj = _move_projection_center(state['worker']['pos'], move)
         if not_wrapped.contains(proj):
-            return move, state
+            return move, tzd.dissoc(state, 'path_pts_to_not_wrapped')
 
     if not state.get('path_pts_to_not_wrapped'):
-        incidence_m = _incidence_matrix(situable)
         target_tile = tzf.thread_first(not_wrapped.representative_point(),
                                        _shapely_point2pt,
                                        _snap_to_tile)
+        print('Finding shortest path from tile {} to {}'.format(state['worker']['pos'], target_tile))
+
+        incidence_m = _incidence_matrix(situable)
         target_vertex_ind = _incidence_ind(target_tile[0], target_tile[1], x_size=math.ceil(situable.bounds[2]))
         path_dists, path_predecessors = sp.sparse.csgraph.shortest_path(csgraph=incidence_m,
                                                                         directed=False,
@@ -234,6 +235,7 @@ def _predict_action(state):
         path_inds = _path_inds(path_predecessors, start_vertex_ind)
         path_pts = [_incidence_pt(ind, x_size=math.ceil(situable.bounds[2]))
                     for ind in path_inds]
+        print('Found path: {}'.format(path_pts))
         state = tzd.assoc(state, 'path_pts_to_not_wrapped', path_pts)
 
     path_move = _projection_pt_move(state['worker']['pos'], state['path_pts_to_not_wrapped'][0])
@@ -293,10 +295,13 @@ def main():
 
     states = [initial_state]
     shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
-    for turn_i in range(300):
+    for turn_i in range(600):
+        print('- turn {}'.format(turn_i))
         prev_state = states[turn_i]
-        _export_state(prev_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
         action, intermediate_state = _predict_action(prev_state)
+        # if turn_i in range(196, 205):
+        if turn_i in range(0, 1000):
+            _export_state(intermediate_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
         next_state = _update_state(intermediate_state, action)
         states.append(next_state)
 
