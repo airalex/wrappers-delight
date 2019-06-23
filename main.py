@@ -169,6 +169,12 @@ def _incidence_matrix(polygon):
     incidence = sp.sparse.dok_matrix((x_max * y_max, x_max * y_max), dtype=bool)
     for tile_y in range(y_min, y_max):
         for tile_x in range(x_min, x_max):
+            middle_center = tzf.thread_first((tile_x, tile_y),
+                                             _tile_pt2center_pt,
+                                             lambda pt: shapely.geometry.Point(*pt))
+            if not polygon.contains(middle_center):
+                continue
+
             middle_ind = _incidence_ind(tile_x, tile_y, x_size=x_max)
             for move in ['W', 'S', 'A', 'D']:
                 moved_center = _move_projection_center((tile_x, tile_y), move)
@@ -301,11 +307,35 @@ def main():
         print('- turn {}'.format(turn_i))
         prev_state = states[turn_i]
         action, intermediate_state = _predict_action(prev_state)
-        # if turn_i in range(196, 205):
         if turn_i in range(0, 1000):
             _export_state(intermediate_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
         next_state = _update_state(intermediate_state, action)
         states.append(next_state)
+
+    # draw_opts = {'render_scale': 10}
+    # desc_path = _desc_path()
+
+    # state = initial_state
+    # mine = shapely.geometry.Polygon(state['desc']['mine_shell'])
+    # obstacles = [shapely.geometry.Polygon(sh) for sh in state['desc']['obstacle_shells']]
+    # obstacle = shapely.ops.unary_union(obstacles)
+    # situable = mine.difference(obstacle)
+
+    # incidence_m = _incidence_matrix(situable).todok()
+
+    # map_bbox = PIL.ImagePath.Path(state['desc']['mine_shell']).getbbox()
+    # map_size = [math.ceil(a * draw_opts['render_scale'])
+    #             for a in [map_bbox[2] - map_bbox[0], map_bbox[3] - map_bbox[1]]]
+    # im = PIL.Image.new('RGBA', map_size)
+
+    # for (i, j), v in incidence_m.items():
+    #     pt_i = _incidence_pt(i, x_size=math.ceil(map_bbox[2]))
+    #     pt_j = _incidence_pt(j, x_size=math.ceil(map_bbox[2]))
+    #     _draw_point(im, pt_i, scale=draw_opts['render_scale'], color='white')
+    #     _draw_point(im, pt_j, scale=draw_opts['render_scale'], color='white')
+
+    # os.makedirs(_output_image_dir(desc_path), exist_ok=True)
+    # _export_im(im, _output_image_dir(desc_path) + '/incidence.png', draw_opts)
 
 
 if __name__ == '__main__':
