@@ -17,7 +17,7 @@ import shapely.ops
 
 def _desc_path():
     # return './data/part-1-examples/example-01.desc'
-    return './data/part-1-initial/prob-004.desc'
+    return './data/part-1-initial/prob-002.desc'
 
 
 def _point_pattern():
@@ -139,9 +139,12 @@ def _move_projection_center(pos, move):
 
 def _predict_action(state):
     mine = shapely.geometry.Polygon(state['desc']['mine_shell'])
+    obstacles = [shapely.geometry.Polygon(sh) for sh in state['desc']['obstacle_shells']]
+    obstacle = shapely.ops.unary_union(obstacles)
+    situable = mine.difference(obstacle)
     wrappeds = [shapely.geometry.Polygon(sh) for sh in state['wrapped_shells']]
     wrapped = shapely.ops.unary_union(wrappeds)
-    not_wrapped = mine.difference(wrapped)
+    not_wrapped = situable.difference(wrapped)
     print(not_wrapped.area)
 
     last_move = state.get('last_move', 'W')
@@ -206,7 +209,7 @@ def main():
 
     states = [initial_state]
     shutil.rmtree(_output_image_dir(_desc_path()), ignore_errors=True)
-    for turn_i in range(100):
+    for turn_i in range(60):
         prev_state = states[turn_i]
         _export_state(prev_state, turn_i, _desc_path(), draw_opts={'render_scale': 10})
         action = _predict_action(prev_state)
