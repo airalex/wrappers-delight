@@ -6,6 +6,8 @@
 > 
 > The bit, bit a wrap, and you don't stop, ICFP 2019
 
+![example_solution](data/example_solution.gif)
+
 ## setup
 
 ```bash
